@@ -156,7 +156,7 @@ for (const [how, command] of [
   ["by its own path", () => launcher],
   ["through an absolute and a relative symlink", linkedLauncher],
 ] satisfies [string, () => string][]) {
-  test(`the launcher reached ${how} writes the committed chart on this Node`, () => {
+  test(`the launcher reached ${how} writes the committed chart on this Node`, { skip: process.platform === "win32" && "POSIX shell launcher; Windows uses statechart.cmd / direct node" }, () => {
     const dir = path.join(corpus, "MediaPlayer");
     const r = run(dir, {
       command: [command()],
@@ -188,7 +188,7 @@ const fakeBun = (version: string) => () => {
   return bin;
 };
 
-test("the launcher runs statechart.ts on Bun 1.1.5 when PATH has no Node", () => {
+test("the launcher runs statechart.ts on Bun 1.1.5 when PATH has no Node", { skip: process.platform === "win32" && "POSIX shell launcher test" }, () => {
   const r = run(path.join(corpus, "Login"), {
     command: [launcher],
     env: { PATH: fakeBun("1.1.5")() },
@@ -203,7 +203,7 @@ for (const [what, bin] of [
   ["has only a node that fails --version", unsetNode],
   ["has only Bun 1.1.4", fakeBun("1.1.4")],
 ] satisfies [string, () => string][]) {
-  test(`the launcher stops with exit 127 and names only the runtimes when PATH ${what}`, () => {
+  test(`the launcher stops with exit 127 and names only the runtimes when PATH ${what}`, { skip: process.platform === "win32" && "POSIX shell launcher test" }, () => {
     const r = run(path.join(corpus, "Login"), { command: [launcher], env: { PATH: bin() } });
     assert.equal(r.status, 127);
     assert.equal(

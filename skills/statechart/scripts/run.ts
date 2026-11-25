@@ -134,8 +134,14 @@ const runToFiles = (
     const fds: number[] = [];
     for (const f of files) fds.push(fs.openSync(f, "w"));
     let child: ChildProcess;
+    // Windows cannot exec a script by shebang. When the target is a Node
+    // script (the test harness's fake java.ts), run it through this Node.
+    const nodeScript = process.platform === "win32" && /\.[cm]?[jt]s$/i.test(file);
+    const [bin, binArgs] = nodeScript
+      ? [process.execPath, ["--disable-warning=ExperimentalWarning", file, ...args]]
+      : [file, args];
     try {
-      child = spawn(file, args, { ...options, stdio: ["ignore", ...fds], windowsHide: true });
+      child = spawn(bin, binArgs, { ...options, stdio: ["ignore", ...fds], windowsHide: true });
     } finally {
       for (const fd of fds) fs.closeSync(fd);
     }
