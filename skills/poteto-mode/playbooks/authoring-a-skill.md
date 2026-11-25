@@ -2,8 +2,8 @@
 
 **You own the skill's voice.**
 
-1. Use the **create-skill** skill (Cursor's built-in for authoring SKILL.md files).
-2. Validate the skill: frontmatter has `name` and `description`, referenced files exist, cross-skill links resolve.
+1. Author the SKILL.md directly in Devin format (`.devin/skills/<name>/SKILL.md` or the plugin's `skills/` tree); Cursor's `create-skill` built-in does not exist on Devin. Use `triggers: [user]` unless the skill must fire on every turn.
+2. Validate the skill: frontmatter has `name` and `description`, referenced files exist, cross-skill links resolve, and it appears in `devin skills list` or the plugin validator.
 3. Test cases if structural. Skip if subjective.
 4. Run **Opening a PR**.
 

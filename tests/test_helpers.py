@@ -18,24 +18,24 @@ def run(cmd, cwd=None):
 # --- log.mjs ---
 with tempfile.TemporaryDirectory() as td:
     logf = os.path.join(td, "sub dir", "decisions.tsv")
-    r = run(["node", str(REPO/"skills/show-me-your-work/scripts/log.mjs"), logf, "decide x", "because y", "evidence z", "next w"])
+    r = run(["node", str(REPO/"skills/show-me-your-work/scripts/log.mjs"), logf, "phase p", "decide x", "because y", "evidence z", "result w"])
     check("log.mjs exit 0", r.returncode == 0, r.stderr[:200])
     content = Path(logf).read_text(encoding="utf-8") if Path(logf).exists() else ""
     lines = content.splitlines()
-    check("log.mjs header + row", len(lines) == 2 and lines[0].startswith("ts\tdecision"))
+    check("log.mjs header + row", len(lines) == 2 and lines[0] == "ts\tphase\tdecision\twhy\tevidence\tresult")
     check("log.mjs path with spaces", Path(logf).exists())
-    check("log.mjs tab-separated", len(lines[1].split("\t")) == 5 if len(lines) == 2 else False)
+    check("log.mjs tab-separated", len(lines[1].split("\t")) == 6 if len(lines) == 2 else False)
     # formula escaping
-    r2 = run(["node", str(REPO/"skills/show-me-your-work/scripts/log.mjs"), logf, "=evil", "+x", "-y", "@z"])
+    r2 = run(["node", str(REPO/"skills/show-me-your-work/scripts/log.mjs"), logf, "p", "=evil", "+x", "-y", "@z"])
     row2 = Path(logf).read_text(encoding="utf-8").splitlines()[2]
     check("log.mjs formula escape", "'=evil" in row2 and "'+x" in row2, row2)
     # arity error
     r3 = run(["node", str(REPO/"skills/show-me-your-work/scripts/log.mjs"), logf, "only", "two"])
     check("log.mjs bad arity nonzero", r3.returncode != 0)
     # tabs/newlines normalized
-    run(["node", str(REPO/"skills/show-me-your-work/scripts/log.mjs"), logf, "a\tb", "c\nd", "e", "f"])
+    run(["node", str(REPO/"skills/show-me-your-work/scripts/log.mjs"), logf, "ph", "a\tb", "c\nd", "e", "f"])
     row3 = Path(logf).read_text(encoding="utf-8").splitlines()[3]
-    check("log.mjs tab/newline normalized", len(row3.split("\t")) == 5, row3)
+    check("log.mjs tab/newline normalized", len(row3.split("\t")) == 6, row3)
 
 # --- worktree-audit.mjs ---
 with tempfile.TemporaryDirectory() as td:
@@ -48,7 +48,10 @@ with tempfile.TemporaryDirectory() as td:
         check("worktree-audit valid json", True)
         check("worktree-audit deletionAuthorized false", data.get("deletionAuthorized") is False)
         check("worktree-audit main held", data["worktrees"][0]["bucket"] == "hold-main", str(data["worktrees"][0].get("bucket")))
-        check("worktree-audit no network fields", data.get("remotePrState") == "not-queried")
+        check("worktree-audit schema v2", data.get("schemaVersion") == 2)
+        check("worktree-audit no transcripts", data.get("chatActivity") == "not-available-on-devin")
+        check("worktree-audit dirty column", data["worktrees"][0].get("dirty") == "clean", str(data["worktrees"][0].get("dirty")))
+        check("worktree-audit remote column", data["worktrees"][0].get("remote") in ("no-remote", "detached", "pushed") or data["worktrees"][0].get("remote", "").startswith("ahead"), str(data["worktrees"][0].get("remote")))
     except (json.JSONDecodeError, KeyError, IndexError) as e:
         check("worktree-audit valid json", False, str(e) + r.stdout[:200])
 

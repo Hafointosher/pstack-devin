@@ -20,7 +20,7 @@ The remaining triggers live only here:
 - A fork you could settle by running something → prototype it per `playbooks/prototype.md` instead of asking.
 - Code → name the data shape first. Across a function boundary → **architect**. Fan-out → **swarm**. Bakeoff → **arena**. Contested design → **interrogate**.
 - Prose, your reply included → **unslop**. Docs, PR descriptions, commit messages → **technical-writing**.
-- Before review → **no-comments**. (`cursor-team-kit`'s `/deslop` is Cursor-only and not ported; review slop manually per **unslop**.)
+- Before commit → an **unslop** pass over the diff (`cursor-team-kit`'s `/deslop` is Cursor-only and not ported). Before review → **no-comments**.
 - Shipping UI / IDE / CLI → drive it with the best available tool (Devin browser/desktop tools, Playwright MCP, or the app's own CLI) and verify visually or behaviorally; `cursor-team-kit`'s `control-ui`/`control-cli` are Cursor-only.
 - A number you measured → **benchmark-checklist**.
 - PR status → the **Babysit** playbook. Landing a green stack → the **Shipping** playbook.
@@ -86,11 +86,13 @@ Read the leaf skill in full for any principle you apply. Each entry names when i
 
 **Defaults for every spawn.** Background execution where supported, file pointers not inlined context, and an explicit model per role. The custom profiles ship pinned upstream default models; `/pstack-devin:setup-pstack` writes `.devin/rules/pstack-models.md` and can generate project-local `.devin/agents/` overrides whose per-role lines override the pinned defaults below and the role models in the routed skills (`arena`, `swarm`, `interrogate`). A role with no line keeps its default. A line of `inherit-parent` or `auto` means use the `subagent_general` profile (which inherits the parent model) for write-capable work, or a generated unpinned profile for read-only work. If the rule has no `# defaults: 3` line, an older setup wrote it. Keep honoring its lines, and tell the user once per session to rerun `/pstack-devin:setup-pstack`.
 
+Each code playbook reads its own line in `.devin/rules/pstack-models.md`: `feature, refactoring` for the feature and refactoring playbooks, `bug-fix`, `perf-issue`, `hillclimb` for theirs. Prose and judgment work reads `judgment and prose`. Trivial edits read `swarm workers`. A slug that `devin models list` does not confirm is never retried within the session; fall back per the order below and say so.
+
 - Code, prose, and judgment: `claude-opus-5-5-xhigh-fast` (profile `poteto-agent`).
 - Trivial mechanical edits: `claude-opus-5-5-high-fast` (profile `poteto-worker`).
 - Diverse review and design panels: one runner each on `claude-fable-5-2-high` (`poteto-runner-fable`), `claude-opus-5-5-high-fast` (`poteto-runner-opus`), and `gemini-4-neon-xhigh` (`poteto-runner-gemini`); reviewers use `poteto-reviewer-opus` / `poteto-reviewer-gemini` (read-only instructions).
 
-Devin spawns subagents by profile, not by per-call model, so model routing is encoded in these profiles. Validate slugs with `devin models list --format json` before relying on them; a missing slug falls back to the generated project override, then the closest validated same-family slug, then `agent.subagent_model`, then `subagent_general`. Disclose every fallback.
+Devin spawns subagents by profile, not by per-call model, so model routing is encoded in these profiles. For every spawn, select the profile in this order: (1) a generated project override `.devin/agents/pstack-<role>.md` when it exists — setup-pstack writes these from the rule, and a missing seat file means the plugin default for that seat; (2) the plugin's pinned `poteto-<role>` profile; (3) `subagent_general` when the role's value is `inherit-parent` or `auto`. Validate slugs with `devin models list --format json` before relying on them; a missing slug falls back to the generated project override, then the closest validated same-family slug, then `agent.subagent_model`, then `subagent_general`. Disclose every fallback.
 
 **Fable 5.2 is an exception.** It runs outside a panel only when the user named it for this task or two Opus 5.5 xhigh runs of the same brief failed its check. Say which. Difficulty alone never qualifies.
 

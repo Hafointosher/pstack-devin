@@ -45,12 +45,12 @@ Every real slug written must be in the detected set and at `xhigh` or below. `in
 
 ### 5. Write the rule
 
-Write `.devin/rules/pstack-models.md` with `alwaysApply: true`, the `# defaults: 3` line, a `# budget` line with the chosen label and the effort that label names, and one line per role, using the same labels poteto-mode uses. Overwrite the whole file so re-runs stay idempotent. Shape:
+Write `.devin/rules/pstack-models.md` with `trigger: always_on` in its frontmatter, the `# defaults: 3` line, a `# budget` line with the chosen label and the effort that label names, and one line per role, using the same labels poteto-mode uses. Overwrite the whole file so re-runs stay idempotent. Shape:
 
 ```
 ---
 description: pstack per-role model choices (overrides skill defaults)
-alwaysApply: true
+trigger: always_on
 ---
 # pstack model configuration. One line per role. Delete a line to fall back to the skill default.
 # `inherit-parent` or `auto` as a value: the role runs on the parent chat model (use the `subagent_general` profile, which inherits the parent model). Alias entries in a panel list still count toward its fan-out.
@@ -67,14 +67,25 @@ swarm workers: claude-opus-5-5-high-fast
 interrogate reviewers: claude-fable-5-2-high, claude-opus-5-5-high-fast, gemini-4-neon-xhigh
 ```
 
-### 6. Confirm
+### 6. Generate profile overrides (offer, then write on yes)
 
-Tell the user the rule was written and that it applies to new sessions. Re-running this skill updates it.
+Devin spawns subagents by profile, not by per-call model, so the rule alone cannot change what a pinned plugin profile runs. Offer once: "generate project-local profiles in `.devin/agents/` so these choices take effect mechanically?" On yes, write one profile per role group, copying the behavioral instructions from the plugin's `agents/` files and setting only the `model:` frontmatter to the validated value:
 
-### 7. Offer a verification skill (optional)
+- `pstack-agent` — the code/judgment roles (`feature, refactoring`, `bug-fix`, `perf-issue`, `hillclimb`, `judgment and prose`); body copied from the plugin's `poteto-agent`.
+- `pstack-worker` — the `swarm workers` role; body copied from `poteto-worker`.
+- `pstack-runner-1`, `pstack-runner-2`, `pstack-runner-3` — the panel seats in list order (`arena runners` and `interrogate reviewers` share the order); bodies copied from `poteto-runner-fable`/`poteto-runner-opus`/`poteto-runner-gemini` respectively. Fewer entries than seats means fewer seats run; write only as many as the list holds.
+- `pstack-reviewer-1`, `pstack-reviewer-2` — the cross-judge/reviewer seats in list order; bodies copied from the reviewer profiles. A seat whose value is `inherit-parent` or `auto` gets no `model:` frontmatter line at all, so the profile runs on the parent model.
+
+Never write a profile whose `model:` slug failed validation in step 4. Never overwrite a `.devin/agents/pstack-*.md` file the user edited by hand without saying so first; compare with what this skill would generate and report the drift instead. Plugin files are never edited.
+
+### 7. Confirm
+
+Tell the user the rule was written, which profiles were generated or why none were, and that both apply to new sessions. Re-running this skill updates them.
+
+### 8. Offer a verification skill (optional)
 
 Check whether the project has a way to drive the real app for proof (a `verify-*` skill, or an existing harness). If not, offer once: "want a project-local verification skill, so agents can drive the app the way a user does and prove changes work? I can generate one with /create-verification-skill." On yes, invoke `/create-verification-skill` (resolves wherever pstack is installed: workspace, user, or plugin). On no, move on without pushing.
 
-### 8. Offer a formal verification skill (optional)
+### 9. Offer a formal verification skill (optional)
 
 Check whether the project already has a formal verification skill (a project skill that runs a model checker, a proof, or another verifier against the code). If not, offer once: "want a formal verification skill, so agents can prove a key property of your code holds in every case in scope, not only the cases tests reach? I can generate one with /create-formal-verification-skill." On yes, invoke `/create-formal-verification-skill` (resolves wherever pstack is installed: workspace, user, or plugin). On no, move on without pushing.

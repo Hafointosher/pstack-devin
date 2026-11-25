@@ -113,7 +113,11 @@ export class Command {
         continue;
       }
       const raw = eq >= 0 ? arg.slice(eq + 1) : args[++i];
-      if (raw === undefined) this.error(`error: option '${flag}' requires a value`);
+      // A space-separated value that is itself option-like is not consumed:
+      // commander treats `--owner --repo` as a missing argument, not as the
+      // owner being "--repo". The `--owner=--repo` form is explicit and legal.
+      if (raw === undefined || (eq < 0 && raw.startsWith("--")))
+        this.error(`error: option '${flag}' requires a value`);
       try {
         values[spec!.key] = spec!.parser ? spec!.parser(raw) : raw;
       } catch (e) {
