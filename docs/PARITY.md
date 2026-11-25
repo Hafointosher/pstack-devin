@@ -15,6 +15,8 @@ All 59 upstream skills and 22 poteto-mode playbooks are present under their orig
 ## Files intentionally absent vs upstream
 
 - `watch-pr` `package.json`/`bun.lock`/`bootstrap.ts` — no dependencies remain to install.
+- `watch-pr` `types.compile.ts` compile-time type assertions — dropped with the Bun/typecheck harness; runtime behavior is covered by the 53-case node:test suite.
+- worktree-audit transcript scan — Cursor chats are local files; Devin sessions are not, so recency verification is an explicit user-confirmation gate in the playbook (documented there). PR state is a best-effort `gh` lookup, matching upstream's evidence wherever `gh` is available.
 - `plugin.json` (Cursor format) — replaced by `.devin-plugin/plugin.json`.
 - Root-level Cursor marketplace metadata.
 
