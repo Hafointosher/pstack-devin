@@ -352,15 +352,17 @@ function gridCase(n: number) {
 function sleepyJava(fakes: string) {
   const java = path.join(fakes, "java.mjs");
   const pidFile = path.join(fakes, "java.pid");
+  const ppidFile = path.join(fakes, "java.ppid");
   fs.writeFileSync(
     java,
     `#!/usr/bin/env node\nimport fs from "node:fs";\n` +
       `process.on("SIGTERM", () => {});\n` +
       `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
+      `fs.writeFileSync(${JSON.stringify(ppidFile)}, String(process.ppid));\n` +
       `setTimeout(() => {}, 60_000);\n`,
     { mode: 0o755 },
   );
-  return { java, pidFile };
+  return { java, pidFile, ppidFile };
 }
 
 test(
@@ -422,25 +424,32 @@ test(
   async () => {
     const fakes = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-fakes-"));
     const parent = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-parent-"));
-    const { java, pidFile } = sleepyJava(fakes);
+    const { java, pidFile, ppidFile } = sleepyJava(fakes);
     const child = startCommand(path.join(corpus, "DieHard"), parent, { java });
     let stderr = "";
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk));
     const closed = once(child, "close");
-    while (!fs.existsSync(pidFile) || !read(pidFile)) await sleep(20);
-    const ps = spawnSync("ps", ["-o", "ppid=", "-p", read(pidFile)], { encoding: "utf8" });
-    process.kill(Number(ps.stdout), "SIGKILL");
+    while (!fs.existsSync(pidFile) || !read(pidFile) || !fs.existsSync(ppidFile)) await sleep(20);
+    process.kill(Number(read(ppidFile)), "SIGKILL");
     const [status] = await closed;
-    assert.equal(stderr, "SIGKILL killed the check, so the command wrote nothing.\n");
+    // Windows delivers no signals: termination reports exit code 1 with a null
+    // signalCode, so the command cannot name the signal and writes nothing in
+    // silence. The stop guarantee — exit 2, nothing written — is cross-platform.
+    assert.equal(
+      stderr,
+      process.platform === "win32" ? "" : "SIGKILL killed the check, so the command wrote nothing.\n",
+    );
     assert.equal(status, 2);
     assert.deepEqual(fs.readdirSync(parent), []);
   },
 );
 
+const REASON = process.platform === "win32" && "Windows cannot deliver SIGINT/SIGTERM to a child process gracefully; the hard-kill cleanup path is covered by the SIGKILL tests";
+
 for (const signal of ["SIGINT", "SIGTERM"] satisfies NodeJS.Signals[]) {
   test(
     `${signal} stops TLC, removes the temporary folder, and writes nothing`,
-    { timeout: 30_000 },
+    { timeout: 30_000, skip: REASON },
     async () => {
       const { pidFile } = await signalWhile(signal, (fakes) => {
         const fake = sleepyJava(fakes);
@@ -456,7 +465,7 @@ for (const signal of ["SIGINT", "SIGTERM"] satisfies NodeJS.Signals[]) {
 
   test(
     `${signal} while the view draws the chart stops the command, and it writes nothing`,
-    { timeout: 60_000 },
+    { timeout: 60_000, skip: REASON },
     () =>
       signalWhile(signal, (fakes) => {
         const drawing = path.join(fakes, "drawing");
@@ -479,7 +488,7 @@ for (const signal of ["SIGINT", "SIGTERM"] satisfies NodeJS.Signals[]) {
 
   test(
     `${signal} while the command writes its files stops it, and it writes nothing`,
-    { timeout: 60_000 },
+    { timeout: 60_000, skip: REASON },
     () =>
       signalWhile(signal, () => ({
         dir: gridCase(150),
@@ -497,7 +506,7 @@ for (const signal of ["SIGINT", "SIGTERM"] satisfies NodeJS.Signals[]) {
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] satisfies NodeJS.Signals[]) {
-  test(`${signal} while the command reads TLC's last output stops the check and writes nothing`, () => {
+  test(`${signal} while the command reads TLC's last output stops the check and writes nothing`, { skip: REASON }, () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "statechart-late-"));
     const java = path.join(tmp, "java.mjs");
     const tmpdir = path.join(tmp, "tmpdir");
@@ -746,8 +755,8 @@ test("a step hidden by the view is not drawn, and the report counts it", () => {
   const view = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "statechart-view-")), "view.mjs");
   fs.writeFileSync(
     view,
-    `export * from ${JSON.stringify(path.join(dir, "view.mjs"))};\n` +
-      `import { step as words } from ${JSON.stringify(path.join(dir, "view.mjs"))};\n` +
+    `export * from ${JSON.stringify(pathToFileURL(path.join(dir, "view.mjs")).href)};\n` +
+      `import { step as words } from ${JSON.stringify(pathToFileURL(path.join(dir, "view.mjs")).href)};\n` +
       `export const step = (action, from, to) => action === "ACallComesIn" ? null : words(action, from, to);\n`,
   );
   const r = run(dir, { view });
@@ -765,7 +774,7 @@ test("a view that hides a step of a bug path stops the command with exit 2", () 
   const view = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "statechart-view-")), "view.mjs");
   fs.writeFileSync(
     view,
-    `export * from ${JSON.stringify(path.join(dir, "view.mjs"))};\n` +
+    `export * from ${JSON.stringify(pathToFileURL(path.join(dir, "view.mjs")).href)};\n` +
       `export const step = (action) => (action === "YouTurnItUp" ? null : action);\n`,
   );
   const r = run(dir, { view });
@@ -1185,12 +1194,14 @@ for (const [what, make, words] of [
 test("a file that appears in --out while TLC runs is kept, and the command stops with exit 2", () => {
   const out = newPath();
   const mine = path.join(out, "report.md");
-  const java = path.join(path.dirname(out), "java.sh");
+  const java = path.join(path.dirname(out), "java.mjs");
   fs.writeFileSync(
     java,
-    `#!/bin/sh\nmkdir -p ${JSON.stringify(out)}\n` +
-      `[ -e ${JSON.stringify(mine)} ] || echo mine > ${JSON.stringify(mine)}\n` +
-      `exec ${JSON.stringify(path.join(here, "java.ts"))} "$@"\n`,
+    `#!/usr/bin/env node\nimport fs from "node:fs";\nimport { spawnSync } from "node:child_process";\n` +
+      `fs.mkdirSync(${JSON.stringify(out)}, { recursive: true });\n` +
+      `if (!fs.existsSync(${JSON.stringify(mine)})) fs.writeFileSync(${JSON.stringify(mine)}, "mine\\n");\n` +
+      `const r = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", ${JSON.stringify(path.join(here, "java.ts"))}, ...process.argv.slice(2)], { stdio: "inherit" });\n` +
+      `process.exit(r.status ?? 2);\n`,
     { mode: 0o755 },
   );
   const r = run(path.join(corpus, "Login"), { args: ["--out", out], java });

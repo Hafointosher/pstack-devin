@@ -10,4 +10,4 @@ await finished(process.stdin).catch(() => {});
 const running = !input.includes("exited");
 const groupOutlivesWorker = process.platform !== "win32";
 if (running || groupOutlivesWorker) await killGroup(Number(pid));
-for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
+for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });

@@ -141,9 +141,17 @@ try {
     } else if ((verdict === 0 || verdict === 1) && fs.existsSync(done)) {
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       try {
+        // Windows cannot rename over any existing directory, even an empty
+        // one. Remove the target first when it is an empty directory — rmdir
+        // fails harmlessly for a file, a non-empty directory, or no target.
+        if (process.platform === "win32") {
+          try {
+            fs.rmdirSync(dest);
+          } catch {}
+        }
         fs.renameSync(done, dest);
       } catch (error) {
-        if (codeOf(error) !== "ENOTEMPTY" && codeOf(error) !== "EEXIST") throw error;
+        if (codeOf(error) !== "ENOTEMPTY" && codeOf(error) !== "EEXIST" && codeOf(error) !== "EPERM") throw error;
         throw new Error(
           `${path.join(out, fs.readdirSync(dest).sort()[0])} appeared while the check ran, so the command wrote nothing. Pass --out with a new folder.`,
           { cause: error },
@@ -154,8 +162,8 @@ try {
       exitCode = verdict;
     } else exitCode = 2;
   } finally {
-    fs.rmSync(stage, { recursive: true, force: true });
-    if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(stage, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    if (tmp) fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     janitor?.kill("SIGKILL");
   }
   process.exit(exitCode);
