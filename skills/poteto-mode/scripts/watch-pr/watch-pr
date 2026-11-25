@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+// Node launcher for watch-pr (no Bun, no bootstrap, no auto-install).
+import { main } from "./cli.ts";
+process.exitCode = await main(process.argv.slice(2));

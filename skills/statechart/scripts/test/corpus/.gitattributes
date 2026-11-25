@@ -1,0 +1,2 @@
+# Corpus fixtures are byte-sensitive parser inputs; keep LF everywhere.
+* text=lf eol=lf

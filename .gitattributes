@@ -1,0 +1,6 @@
+# Byte-sensitive fixtures and shell wrappers keep LF; Windows users check out clean.
+*.sh text=lf eol=lf
+skills/statechart/scripts/test/corpus/** text=lf eol=lf
+*.ts text=lf eol=lf
+*.mjs text=lf eol=lf
+*.md text=lf eol=lf

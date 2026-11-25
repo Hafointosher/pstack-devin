@@ -1,0 +1,9 @@
+{
+  "upstreamUrl": "https://github.com/cursor/plugins/tree/main/pstack",
+  "upstreamVersion": "0.15.48",
+  "upstreamCommit": "41e4009",
+  "mirroredAt": "2026-11-25",
+  "license": "MIT",
+  "licenseHolder": "Lauren Tan",
+  "adaptations": "Devin-native packaging, zero-dependency watch-pr Node port, Windows wrappers, profile-based model routing"
+}
